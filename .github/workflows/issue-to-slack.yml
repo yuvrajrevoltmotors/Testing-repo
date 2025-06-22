@@ -13,6 +13,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "New GitHub Issue: ${{ github.event.issue.title }}\n${{ github.event.issue.html_url }}"
+              "text": "🛠️ *New GitHub Issue Created:*\n*${{ github.event.issue.title }}*\n🔗 ${{ github.event.issue.html_url }}"
             }
         env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
