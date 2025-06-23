@@ -22,9 +22,11 @@ jobs:
 
       - name: Prepare Payload
         run: |
-         echo '${{ toJson(github.event.issue.labels) }}' > labels.json
+          # Safely write labels JSON to a file
+          printf '%s' "${{ toJson(github.event.issue.labels) }}" > labels.json 2>/dev/null || echo "[]" > labels.json
           LABELS=$(jq -r '[.[]?.name] | join(", ")' labels.json 2>/dev/null || echo "Not Set")
-          BODY_PREVIEW=$(echo '${{ github.event.issue.body || 'No Body' }}' | jq -r '. | if . == "No Body" then . else (. | tostring | .[0:50]) end' 2>/dev/null || echo "No Body")
+          # Safely handle body preview
+          BODY_PREVIEW=$(printf '%s' "${{ github.event.issue.body || 'No Body' }}" | jq -r '. | if . == "No Body" then . else (. | tostring | .[0:50]) end' 2>/dev/null || echo "No Body")
           jq -n \
             --arg text "🐞 New GitHub Issue Created" \
             --arg title "${{ github.event.issue.title || 'No Title' }}" \
@@ -46,7 +48,7 @@ jobs:
                     { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($Labels)" },
                     { "type": "mrkdwn", "text": "*📝 Title:*\n\($title)" },
                     { "type": "mrkdwn", "text": "*👤 Assigned To:*\n\($assignee)" },
-                    { "type": "mrkdwn", "text": "*📄 Body Preview:*\n\($body_preview)" },
+                    { "type": "mrkdwn", "text": "*📄 Body Preview:*\n\($body_preview)" }
                   ]
                 },
                 {
