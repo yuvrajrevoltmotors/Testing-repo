@@ -9,12 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install jq
-        run: sudo apt-get install -y jq
+        run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Check Slack Webhook
         run: |
           if [ -z "${{ secrets.SLACK_WEBHOOK }}" ]; then
-            echo "SLACK_WEBHOOK is not set or empty"
+            echo "Error: SLACK_WEBHOOK is not set or empty"
             exit 1
           else
             echo "SLACK_WEBHOOK is set"
@@ -22,15 +22,19 @@ jobs:
 
       - name: Prepare Payload
         run: |
-          # Debug labels input
+          # Safely write raw labels JSON and debug
           printf '%s' "${{ toJson(github.event.issue.labels) }}" > labels.json 2>/dev/null || echo "[]" > labels.json
-          echo "Labels JSON content:"
+          echo "Raw Labels JSON:"
           cat labels.json
+          # Extract only label names to ensure valid output
+          jq -r '[.[]?.name // empty] | join(" ")' labels.json > labels.txt 2>/dev/null || echo "Not Set" > labels.txt
+          echo "Extracted Labels:"
+          cat labels.txt
           jq -n \
             --arg text "🐞 New GitHub Issue Created" \
             --arg title "${{ github.event.issue.title || 'No Title' }}" \
             --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
-            --argjson labels "$(cat labels.json)" \
+            --arg Labels "$(cat labels.txt)" \
             --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
             '{
               "text": $text,
@@ -43,7 +47,7 @@ jobs:
                   "type": "section",
                   "fields": [
                     { "type": "mrkdwn", "text": "*📌 Project:*\nRevolt Motors Website" },
-                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($labels | if type == \"array\" and length > 0 then [.[].name // empty] | join(\" \") else \"Not Set\" end)" },
+                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($Labels)" },
                     { "type": "mrkdwn", "text": "*📝 Title:*\n\($title)" },
                     { "type": "mrkdwn", "text": "*👤 Assigned To:*\n\($assignee)" }
                   ]
@@ -54,6 +58,7 @@ jobs:
                 }
               ]
             }' > payload.json
+          echo "Payload JSON:"
           cat payload.json
           jq . payload.json 2>/dev/null || echo "Invalid JSON in payload.json"
 
