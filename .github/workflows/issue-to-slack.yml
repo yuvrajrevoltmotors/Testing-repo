@@ -22,19 +22,18 @@ jobs:
 
       - name: Prepare Payload
         run: |
-          # Safely write raw labels JSON and debug
-          printf '%s' "${{ toJson(github.event.issue.labels) }}" > labels.json 2>/dev/null || echo "[]" > labels.json
-          echo "Raw Labels JSON:"
+          # Debug raw labels input
+          echo "Raw Labels JSON: ${{ toJson(github.event.issue.labels) }}" > labels.json 2>/dev/null || echo "[]" > labels.json
+          echo "Raw Labels JSON Content:"
           cat labels.json
-          # Extract only label names to ensure valid output
-          jq -r '[.[]?.name // empty] | join(" ")' labels.json > labels.txt 2>/dev/null || echo "Not Set" > labels.txt
-          echo "Extracted Labels:"
-          cat labels.txt
+          # Attempt to extract label names, fallback to Not Set
+          LABELS=$(jq -r '[.[]?.name // empty] | join(" ")' labels.json 2>/dev/null || echo "Not Set")
+          echo "Extracted Labels: $LABELS"
           jq -n \
             --arg text "🐞 New GitHub Issue Created" \
             --arg title "${{ github.event.issue.title || 'No Title' }}" \
             --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
-            --arg Labels "$(cat labels.txt)" \
+            --arg Labels "$LABELS" \
             --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
             '{
               "text": $text,
