@@ -22,14 +22,15 @@ jobs:
 
       - name: Prepare Payload
         run: |
-          # Preprocess labels to ensure valid JSON
+          # Debug labels input
           printf '%s' "${{ toJson(github.event.issue.labels) }}" > labels.json 2>/dev/null || echo "[]" > labels.json
-          LABELS=$(jq -r 'if type == "array" and length > 0 then [.[].name // empty] | join("|") else "Not Set" end' labels.json 2>/dev/null || echo "Not Set")
+          echo "Labels JSON content:"
+          cat labels.json
           jq -n \
             --arg text "🐞 New GitHub Issue Created" \
             --arg title "${{ github.event.issue.title || 'No Title' }}" \
             --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
-            --arg Labels "$LABELS" \
+            --argjson labels "$(cat labels.json)" \
             --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
             '{
               "text": $text,
@@ -42,7 +43,7 @@ jobs:
                   "type": "section",
                   "fields": [
                     { "type": "mrkdwn", "text": "*📌 Project:*\nRevolt Motors Website" },
-                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($Labels)" },
+                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($labels | if type == \"array\" and length > 0 then [.[].name // empty] | join(\" \") else \"Not Set\" end)" },
                     { "type": "mrkdwn", "text": "*📝 Title:*\n\($title)" },
                     { "type": "mrkdwn", "text": "*👤 Assigned To:*\n\($assignee)" }
                   ]
