@@ -12,11 +12,14 @@ jobs:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Extract labels to env
+      - name: Extract label names
         run: |
           echo '${{ toJSON(github.event.issue.labels) }}' > labels.json
           LABELS=$(jq -r '[.[].name] | join(", ")' labels.json)
-          echo "LABELS=${LABELS:-Not Set}" >> $GITHUB_ENV
+          if [ -z "$LABELS" ]; then
+            LABELS="Not Set"
+          fi
+          echo "LABELS=$LABELS" >> $GITHUB_ENV
 
       - name: Prepare Slack Payload
         run: |
@@ -27,24 +30,24 @@ jobs:
             --arg issue_url "${{ github.event.issue.html_url }}" \
             --arg labels "$LABELS" \
             '{
-              "text": $text,
-              "blocks": [
+              text: $text,
+              blocks: [
                 {
-                  "type": "header",
-                  "text": { "type": "plain_text", "text": $text, "emoji": true }
+                  type: "header",
+                  text: { type: "plain_text", text: $text, emoji: true }
                 },
                 {
-                  "type": "section",
-                  "fields": [
-                    { "type": "mrkdwn", "text": "*📌 Project:*\nRevolt Motors Website" },
-                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($labels)" },
-                    { "type": "mrkdwn", "text": "*📝 Title:*\n\($title)" },
-                    { "type": "mrkdwn", "text": "*👤 Assigned To:*\n\($assignee)" }
+                  type: "section",
+                  fields: [
+                    { type: "mrkdwn", text: "*📌 Project:*\nRevolt Motors Website" },
+                    { type: "mrkdwn", text: "*🚨 Labels:*\n\($labels)" },
+                    { type: "mrkdwn", text: "*📝 Title:*\n\($title)" },
+                    { type: "mrkdwn", text: "*👤 Assigned To:*\n\($assignee)" }
                   ]
                 },
                 {
-                  "type": "section",
-                  "text": { "type": "mrkdwn", "text": "<\($issue_url)|🔗 View Issue>" }
+                  type: "section",
+                  text: { type: "mrkdwn", text: "<\($issue_url)|🔗 View Issue>" }
                 }
               ]
             }' > payload.json
