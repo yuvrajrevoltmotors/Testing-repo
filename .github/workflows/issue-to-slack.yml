@@ -26,52 +26,65 @@ jobs:
       - name: Prepare Payload
         id: prepare_payload
         run: |
-          TITLE=$(echo '${{ github.event.issue.title }}' | jq -R -s .)
+          # Escape variables with jq to handle special characters
+          TITLE=$(echo '${{ github.event.issue.title || 'No Title' }}' | jq -R -s .)
           ASSIGNEE=$(echo '${{ github.event.issue.assignee.login || 'Unassigned' }}' | jq -R -s .)
           PRIORITY=$(echo '${{ github.event.issue.labels[0].name || 'Not Set' }}' | jq -R -s .)
-          ISSUE_URL=$(echo '${{ github.event.issue.html_url }}' | jq -R -s .)
-          echo "{
-            \"text\": \"🐞 New GitHub Issue Created\",
-            \"blocks\": [
-              {
-                \"type\": \"header\",
-                \"text\": {
-                  \"type\": \"plain_text\",
-                  \"text\": \"🐞 New GitHub Issue Created\",
-                  \"emoji\": true
-                }
-              },
-              {
-                \"type\": \"section\",
-                \"fields\": [
-                  {
-                    \"type\": \"mrkdwn\",
-                    \"text\": \"*📌 Project:*\nRevolt Motors Website\"
-                  },
-                  {
-                    \"type\": \"mrkdwn\",
-                    \"text\": \"*🚨 Priority:*\n$PRIORITY\"
-                  },
-                  {
-                    \"type\": \"mrkdwn\",
-                    \"text\": \"*📝 Title:*\n$TITLE\"
-                  },
-                  {
-                    \"type\": \"mrkdwn\",
-                    \"text\": \"*👤 Assigned To:*\n$ASSIGNEE\"
+          ISSUE_URL=$(echo '${{ github.event.issue.html_url || 'No URL' }}' | jq -R -s .)
+
+          # Use jq to construct JSON to avoid shell escaping issues
+          jq -n \
+            --arg text "🐞 New GitHub Issue Created" \
+            --arg project "Revolt Motors Website" \
+            --arg priority "$PRIORITY" \
+            --arg title "$TITLE" \
+            --arg assignee "$ASSIGNEE" \
+            --arg issue_url "$ISSUE_URL" \
+            '{
+              "text": $text,
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": $text,
+                    "emoji": true
                   }
-                ]
-              },
-              {
-                \"type\": \"section\",
-                \"text\": {
-                  \"type\": \"mrkdwn\",
-                  \"text\": \"<$ISSUE_URL|🔗 View Issue>\"
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*📌 Project:*\n" + $project
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*🚨 Priority:*\n" + $priority
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*📝 Title:*\n" + $title
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*👤 Assigned To:*\n" + $assignee
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<" + $issue_url + "|🔗 View Issue>"
+                  }
                 }
-              }
-            ]
-          }" > payload.json
+              ]
+            }' > payload.json
           cat payload.json
+
+      - name: Validate Payload
+        run: jq . payload.json || echo "Invalid JSON in payload.json"
 
       - name: Send Slack notification
         id: send_slack
