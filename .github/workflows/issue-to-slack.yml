@@ -8,57 +8,50 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-
-      - name: Prepare payload with all labels
-        run: |
-          echo '${{ toJson(github.event.issue.labels) }}' > labels.json
-
-          # Create a clean space-separated label string
-          LABEL_STRING=$(jq -r '[.[].name] | join(" ")' labels.json 2>/dev/null || echo "Not Set")
-
-          # Create the final Slack message payload
-          jq -n \
-            --arg text "🐞 New GitHub Issue Created" \
-            --arg project "Revolt Motors Website" \
-            --arg labels "$LABEL_STRING" \
-            --arg title "${{ github.event.issue.title || 'No Title' }}" \
-            --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
-            --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
-            '{
-              "text": $text,
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "🐞 New GitHub Issue Created",
               "blocks": [
                 {
                   "type": "header",
                   "text": {
                     "type": "plain_text",
-                    "text": $text,
+                    "text": "🐞 New GitHub Issue Created",
                     "emoji": true
                   }
                 },
                 {
                   "type": "section",
                   "fields": [
-                    { "type": "mrkdwn", "text": "*📌 Project:*\n\($project)" },
-                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($labels)" },
-                    { "type": "mrkdwn", "text": "*📝 Title:*\n\($title)" },
-                    { "type": "mrkdwn", "text": "*👤 Assigned To:*\n\($assignee)" }
+                    {
+                      "type": "mrkdwn",
+                      "text": "*📌 Project:*\nRevolt Motors Website"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*🚨 Labels:*\n${{ join(github.event.issue.labels.*.name, ', ') || 'Not Set' }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*📝 Title:*\n${{ github.event.issue.title }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*👤 Assigned To:*\n${{ github.event.issue.assignee.login || 'Unassigned' }}"
+                    }
                   ]
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "<\($issue_url)|🔗 View Issue>"
+                    "text": "<${{ github.event.issue.html_url }}|🔗 View Issue>"
                   }
                 }
               ]
-            }' > payload.json
-
-          echo "Payload JSON Content:"
-          cat payload.json
-
-      - name: Send to Slack
-        run: |
-          curl -X POST -H 'Content-type: application/json' --data @payload.json ${{ secrets.SLACK_WEBHOOK }}
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
