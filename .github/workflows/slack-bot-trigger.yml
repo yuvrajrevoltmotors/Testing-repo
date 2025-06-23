@@ -1,0 +1,58 @@
+name: Triggered by Slack Bot
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "GitHub Issue Number"
+        required: true
+      slack_channel:
+        description: "Slack Channel ID"
+        required: true
+
+jobs:
+  notify-slack:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get Issue Details
+        uses: actions/github-script@v7
+        id: issue
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt('${{ github.event.inputs.issue_number }}'),
+            });
+            const labels = issue.data.labels.map(label => label.name).join(", ");
+            const assignee = issue.data.assignee ? issue.data.assignee.login : 'Unassigned';
+            return {
+              title: issue.data.title,
+              url: issue.data.html_url,
+              labels,
+              assignee
+            };
+
+      - name: Send Slack Message
+        uses: slackapi/slack-github-action@v2.1.0
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          payload: |
+            channel: ${{ github.event.inputs.slack_channel }}
+            text: "🐞 GitHub Issue Details"
+            blocks:
+              - type: "section"
+                fields:
+                  - type: "mrkdwn"
+                    text: "*📝 Title:*\n${{ steps.issue.outputs.result.title }}"
+                  - type: "mrkdwn"
+                    text: "*🚨 Labels:*\n${{ steps.issue.outputs.result.labels }}"
+                  - type: "mrkdwn"
+                    text: "*👤 Assigned To:*\n${{ steps.issue.outputs.result.assignee }}"
+              - type: "section"
+                text:
+                  type: "mrkdwn"
+                  text: "<${{ steps.issue.outputs.result.url }}|🔗 View Issue>"
