@@ -26,7 +26,7 @@ jobs:
             --arg text "🐞 New GitHub Issue Created" \
             --arg title "${{ github.event.issue.title || 'No Title' }}" \
             --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
-            --arg priority "${{ github.event.issue.labels[0].name || 'Not Set' }}" \
+            --arg Labels "${{ github.event.issue.labels[0].name || 'Not Set' }}" \
             --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
             '{
               "text": $text,
@@ -39,7 +39,7 @@ jobs:
                   "type": "section",
                   "fields": [
                     { "type": "mrkdwn", "text": "*📌 Project:*\nRevolt Motors Website" },
-                    { "type": "mrkdwn", "text": "*🚨 Priority:*\n\($priority)" },
+                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($labels)" },
                     { "type": "mrkdwn", "text": "*📝 Title:*\n\($title)" },
                     { "type": "mrkdwn", "text": "*👤 Assigned To:*\n\($assignee)" }
                   ]
