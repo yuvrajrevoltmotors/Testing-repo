@@ -13,6 +13,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Extract label names
+        id: extract_labels
         run: |
           echo '${{ toJSON(github.event.issue.labels) }}' > labels.json
           LABELS=$(jq -r '[.[].name] | join(", ")' labels.json)
@@ -26,6 +27,7 @@ jobs:
           TITLE: ${{ github.event.issue.title }}
           ASSIGNEE: ${{ github.event.issue.assignee.login || 'Unassigned' }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
+          LABELS: ${{ env.LABELS }}
         run: |
           jq -n \
             --arg text "🐞 New GitHub Issue Created" \
@@ -33,8 +35,7 @@ jobs:
             --arg assignee "$ASSIGNEE" \
             --arg issue_url "$ISSUE_URL" \
             --arg labels "$LABELS" \
-            '
-            {
+            '{
               text: $text,
               blocks: [
                 {
@@ -45,20 +46,19 @@ jobs:
                   type: "section",
                   fields: [
                     { type: "mrkdwn", text: "*📌 Project:*\nRevolt Motors Website" },
-                    { type: "mrkdwn", text: "*🚨 Labels:*\n\($labels)" },
-                    { type: "mrkdwn", text: "*📝 Title:*\n\($title)" },
-                    { type: "mrkdwn", text: "*👤 Assigned To:*\n\($assignee)" }
+                    { type: "mrkdwn", text: "*🚨 Labels:*\n" + $labels },
+                    { type: "mrkdwn", text: "*📝 Title:*\n" + $title },
+                    { type: "mrkdwn", text: "*👤 Assigned To:*\n" + $assignee }
                   ]
                 },
                 {
                   type: "section",
-                  text: { type: "mrkdwn", text: "<\($issue_url)|🔗 View Issue>" }
+                  text: { type: "mrkdwn", text: "<" + $issue_url + "|🔗 View Issue>" }
                 }
               ]
-            }
-            ' > payload.json
+            }' > payload.json
 
-          echo "Payload prepared:"
+          echo "✅ Slack payload prepared:"
           cat payload.json
 
       - name: Send Slack Notification
