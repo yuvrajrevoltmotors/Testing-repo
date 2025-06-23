@@ -13,7 +13,37 @@ jobs:
         with:
           payload: |
             {
-              "text": "🛠️ *New GitHub Issue Created:*\n*${{ github.event.issue.title }}*\n🔗 ${{ github.event.issue.html_url }}"
+              "text": "*🐞 New GitHub Issue Created*",
+              "blocks": [
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*📌 Project:*\nRevolt Motors Website"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*🚨 Priority:*\n${{ github.event.issue.labels[0].name || 'Not Set' }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*📝 Title:*\n${{ github.event.issue.title }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*👤 Assigned To:*\n${{ github.event.issue.assignee.login || 'Unassigned' }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*🔗 Link to Issue:*\n${{ github.event.issue.html_url }}"
+                  }
+                }
+              ]
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
