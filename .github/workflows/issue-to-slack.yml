@@ -1,7 +1,5 @@
 name: Notify Slack on Issue Created
 
-working code 
-
 on:
   issues:
     types: [opened]
