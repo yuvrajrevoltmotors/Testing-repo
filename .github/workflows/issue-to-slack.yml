@@ -20,22 +20,18 @@ jobs:
             echo "SLACK_WEBHOOK is set"
           fi
 
-      - name: Debug GitHub Event
-        run: |
-          echo 'GitHub Event Issue JSON:'
-          # Write JSON to a file to avoid shell quoting issues
-          echo "${{ toJson(github.event.issue) }}" > issue.json 2>/dev/null || echo "Failed to write issue.json"
-          jq . issue.json 2>/dev/null || echo "Failed to parse issue.json"
-          cat issue.json 2>/dev/null || echo "No issue.json content"
-
       - name: Prepare Payload
         run: |
-          # Use jq to construct a minimal payload
+          # Construct minimal payload without github.event.issue
           jq -n \
             --arg text "🐞 New GitHub Issue Created" \
             '{
               "text": $text,
               "blocks": [
+                {
+                  "type": "header",
+                  "text": { "type": "plain_text", "text": "🐞 New GitHub Issue Created", "emoji": true }
+                },
                 {
                   "type": "section",
                   "text": { "type": "mrkdwn", "text": "Test Block" }
@@ -45,20 +41,9 @@ jobs:
           cat payload.json
           jq . payload.json 2>/dev/null || echo "Invalid JSON in payload.json"
 
-      - name: Send Slack notification
-        uses: slackapi/slack-github-action@v1.26.0
-        with:
-          payload-file-path: payload.json
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
-        continue-on-error: true
-
-      - name: Debug Slack Notification
-        run: echo "Slack notification step completed with exit code $?"
-
-      - name: Send Slack notification via curl (Fallback)
+      - name: Send Slack Notification via curl
         run: |
-          curl -X POST -H 'Content-type: application/json' --data @payload.json ${{ secrets.SLACK_WEBHOOK }}
+          curl -X POST -H 'Content-type: application/json' --data @payload.json ${{ secrets.SLACK_WEBHOOK }} || echo "curl failed"
         continue-on-error: true
 
       - name: Debug Curl Notification
