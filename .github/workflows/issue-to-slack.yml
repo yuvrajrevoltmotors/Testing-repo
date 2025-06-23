@@ -8,8 +8,11 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
       - name: Debug GitHub Event
-        run: echo "${{ toJson(github.event.issue) }}" 
+        run: echo "${{ toJson(github.event.issue) }}"
 
       - name: Check Slack Webhook
         run: |
@@ -20,50 +23,72 @@ jobs:
             echo "SLACK_WEBHOOK is set"
           fi
 
+      - name: Prepare Payload
+        id: prepare_payload
+        run: |
+          TITLE=$(echo '${{ github.event.issue.title }}' | jq -R -s .)
+          ASSIGNEE=$(echo '${{ github.event.issue.assignee.login || 'Unassigned' }}' | jq -R -s .)
+          PRIORITY=$(echo '${{ github.event.issue.labels[0].name || 'Not Set' }}' | jq -R -s .)
+          ISSUE_URL=$(echo '${{ github.event.issue.html_url }}' | jq -R -s .)
+          echo "{
+            \"text\": \"🐞 New GitHub Issue Created\",
+            \"blocks\": [
+              {
+                \"type\": \"header\",
+                \"text\": {
+                  \"type\": \"plain_text\",
+                  \"text\": \"🐞 New GitHub Issue Created\",
+                  \"emoji\": true
+                }
+              },
+              {
+                \"type\": \"section\",
+                \"fields\": [
+                  {
+                    \"type\": \"mrkdwn\",
+                    \"text\": \"*📌 Project:*\nRevolt Motors Website\"
+                  },
+                  {
+                    \"type\": \"mrkdwn\",
+                    \"text\": \"*🚨 Priority:*\n$PRIORITY\"
+                  },
+                  {
+                    \"type\": \"mrkdwn\",
+                    \"text\": \"*📝 Title:*\n$TITLE\"
+                  },
+                  {
+                    \"type\": \"mrkdwn\",
+                    \"text\": \"*👤 Assigned To:*\n$ASSIGNEE\"
+                  }
+                ]
+              },
+              {
+                \"type\": \"section\",
+                \"text\": {
+                  \"type\": \"mrkdwn\",
+                  \"text\": \"<$ISSUE_URL|🔗 View Issue>\"
+                }
+              }
+            ]
+          }" > payload.json
+          cat payload.json
+
       - name: Send Slack notification
+        id: send_slack
         uses: slackapi/slack-github-action@v1.26.0
         with:
-          payload: |
-            {
-              "text": "🐞 New GitHub Issue Created",
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "🐞 New GitHub Issue Created",
-                    "emoji": true
-                  }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*📌 Project:*\nRevolt Motors Website"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*🚨 Priority:*\n${{ github.event.issue.labels[0].name || 'Not Set' }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*📝 Title:*\n${{ github.event.issue.title || 'No Title' }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*👤 Assigned To:*\n${{ github.event.issue.assignee.login || 'Unassigned' }}"
-                    }
-                  ]
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "<${{ github.event.issue.html_url }}|🔗 View Issue>"
-                  }
-                }
-              ]
-            }
+          payload-file-path: payload.json
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+        continue-on-error: true
+
+      - name: Debug Slack Notification
+        run: echo "Slack notification step completed with exit code $?"
+
+      - name: Send Slack notification via curl (Fallback)
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data @payload.json ${{ secrets.SLACK_WEBHOOK }}
+        continue-on-error: true
+
+      - name: Debug Curl Notification
+        run: echo "Curl notification step completed with exit code $?"
