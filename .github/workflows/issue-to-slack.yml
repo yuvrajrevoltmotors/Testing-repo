@@ -1,5 +1,7 @@
 name: Notify Slack on Issue Created
 
+working code 
+
 on:
   issues:
     types: [opened]
@@ -7,75 +9,56 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
-
     steps:
       - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+        run: sudo apt-get install -y jq
 
-      - name: Extract label names
-        id: extract_labels
+      - name: Check Slack Webhook
         run: |
-          echo '${{ toJSON(github.event.issue.labels) }}' > labels.json
-          labels=$(jq -r '[.[].name] | join(", ")' labels.json)
-          if [ -z "$labels" ]; then
-            labels="Not Set"
+          if [ -z "${{ secrets.SLACK_WEBHOOK }}" ]; then
+            echo "SLACK_WEBHOOK is not set or empty"
+            exit 1
+          else
+            echo "SLACK_WEBHOOK is set"
           fi
-          echo "labels=$labels" >> "$GITHUB_OUTPUT"
 
-      - name: Prepare Slack Payload
-        id: prepare_payload
-        env:
-          TITLE: ${{ github.event.issue.title }}
-          ASSIGNEE: ${{ github.event.issue.assignee.login || 'Unassigned' }}
-          ISSUE_URL: ${{ github.event.issue.html_url }}
-          LABELS: ${{ steps.extract_labels.outputs.labels }}
+      - name: Prepare Payload
         run: |
-          cat <<EOF > payload.json
-{
-  "text": "🐞 New GitHub Issue Created",
-  "blocks": [
-    {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "🐞 New GitHub Issue Created",
-        "emoji": true
-      }
-    },
-    {
-      "type": "section",
-      "fields": [
-        {
-          "type": "mrkdwn",
-          "text": "*📌 Project:*\nRevolt Motors Website"
-        },
-        {
-          "type": "mrkdwn",
-          "text": "*🚨 Labels:*\n${LABELS}"
-        },
-        {
-          "type": "mrkdwn",
-          "text": "*📝 Title:*\n${TITLE}"
-        },
-        {
-          "type": "mrkdwn",
-          "text": "*👤 Assigned To:*\n${ASSIGNEE}"
-        }
-      ]
-    },
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "<${ISSUE_URL}|🔗 View Issue>"
-      }
-    }
-  ]
-}
-EOF
-          echo "✅ Payload file created:"
+          jq -n \
+            --arg text "🐞 New GitHub Issue Created" \
+            --arg title "${{ github.event.issue.title || 'No Title' }}" \
+            --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
+            --arg Labels "${{ github.event.issue.labels[0].name || 'Not Set' }}" \
+            --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
+            '{
+              "text": $text,
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": { "type": "plain_text", "text": $text, "emoji": true }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*📌 Project:*\nRevolt Motors Website" },
+                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($Labels)" },
+                    { "type": "mrkdwn", "text": "*📝 Title:*\n\($title)" },
+                    { "type": "mrkdwn", "text": "*👤 Assigned To:*\n\($assignee)" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": { "type": "mrkdwn", "text": "<\($issue_url)|🔗 View Issue>" }
+                }
+              ]
+            }' > payload.json
           cat payload.json
+          jq . payload.json 2>/dev/null || echo "Invalid JSON in payload.json"
 
-      - name: Send Slack Notification
+      - name: Send Slack Notification via curl
         run: |
-          curl -X POST -H 'Content-type: application/json' --data @payload.json ${{ secrets.SLACK_WEBHOOK }}
+          curl -X POST -H 'Content-type: application/json' --data @payload.json ${{ secrets.SLACK_WEBHOOK }} || echo "curl failed"
+        continue-on-error: true
+
+      - name: Debug Curl Notification
+        run: echo "Curl notification step completed with exit code $?"
