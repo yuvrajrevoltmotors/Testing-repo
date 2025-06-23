@@ -7,30 +7,28 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
-
     steps:
       - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+        run: sudo apt-get install -y jq
+
+      - name: Check Slack Webhook
+        run: |
+          if [ -z "${{ secrets.SLACK_WEBHOOK }}" ]; then
+            echo "SLACK_WEBHOOK is not set or empty"
+            exit 1
+          else
+            echo "SLACK_WEBHOOK is set"
+          fi
 
       - name: Extract Label Names
         id: extract_labels
         run: |
           echo '${{ toJSON(github.event.issue.labels) }}' > labels.json
-          LABELS=$(jq -r '[.[].name] | join(", ")' labels.json)
-          if [ -z "$LABELS" ]; then
-            LABELS="Not Set"
+          labels=$(jq -r '[.[].name] | join(", ")' labels.json)
+          if [ -z "$labels" ]; then
+            labels="Not Set"
           fi
-          echo "LABELS=$LABELS" >> "$GITHUB_ENV"
-          echo "✅ Extracted labels: $LABELS"
-
-      - name: Check Slack Webhook
-        run: |
-          if [ -z "${{ secrets.SLACK_WEBHOOK }}" ]; then
-            echo "❌ SLACK_WEBHOOK is not set or empty"
-            exit 1
-          else
-            echo "✅ SLACK_WEBHOOK is set"
-          fi
+          echo "LABELS=$labels" >> $GITHUB_ENV
 
       - name: Prepare Payload
         env:
@@ -87,8 +85,8 @@ EOF
 
       - name: Send Slack Notification via curl
         run: |
-          curl -X POST -H 'Content-type: application/json' --data @payload.json ${{ secrets.SLACK_WEBHOOK }}
+          curl -X POST -H 'Content-type: application/json' --data @payload.json ${{ secrets.SLACK_WEBHOOK }} || echo "curl failed"
         continue-on-error: true
 
       - name: Debug Curl Notification
-        run: echo "✅ Curl notification step completed with exit code $?"
+        run: echo "Curl notification step completed with exit code $?"
