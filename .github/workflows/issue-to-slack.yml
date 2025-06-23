@@ -14,12 +14,15 @@ jobs:
 
       - name: Prepare Slack Payload
         run: |
+          LABELS_JSON=${{ toJSON(github.event.issue.labels) }}
+          echo "Extracted labels: $LABELS_JSON"
+
           jq -n \
             --arg text "🐞 New GitHub Issue Created" \
             --arg title "${{ github.event.issue.title }}" \
             --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
             --arg issue_url "${{ github.event.issue.html_url }}" \
-            --argjson labels '${{ toJSON(github.event.issue.labels) }}' \
+            --argjson labels "$LABELS_JSON" \
             '{
               "text": $text,
               "blocks": [
@@ -45,6 +48,7 @@ jobs:
 
           echo "Payload prepared:"
           cat payload.json
+
 
 
       - name: Send Slack Notification
