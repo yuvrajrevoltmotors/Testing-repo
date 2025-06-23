@@ -7,25 +7,26 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
+
     steps:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Prepare Slack Payload
         run: |
-          echo '${{ toJSON(github.event.issue.labels) }}' > labels_raw.json
+          echo '${{ toJSON(github.event.issue.labels) }}' > labels.json
 
-          # Safely extract label names
-          LABEL_NAMES=$(jq -r '[.[].name] | join(", ")' labels_raw.json)
-
-          echo "Extracted Labels: $LABEL_NAMES"
+          LABELS=$(jq -r '[.[].name] | join(", ")' labels.json)
+          TITLE="${{ github.event.issue.title }}"
+          ASSIGNEE="${{ github.event.issue.assignee.login || 'Unassigned' }}"
+          ISSUE_URL="${{ github.event.issue.html_url }}"
 
           jq -n \
             --arg text "🐞 New GitHub Issue Created" \
-            --arg title "${{ github.event.issue.title || 'No Title' }}" \
-            --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
-            --arg labels "$LABEL_NAMES" \
-            --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
+            --arg title "$TITLE" \
+            --arg assignee "$ASSIGNEE" \
+            --arg labels "$LABELS" \
+            --arg issue_url "$ISSUE_URL" \
             '{
               "text": $text,
               "blocks": [
@@ -49,7 +50,7 @@ jobs:
               ]
             }' > payload.json
 
-          echo "Final Payload:"
+          echo "Payload prepared:"
           cat payload.json
 
       - name: Send Slack Notification
