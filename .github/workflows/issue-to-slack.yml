@@ -22,14 +22,11 @@ jobs:
 
       - name: Prepare Payload
         run: |
-          # Safely extract all labels, joined by spaces
-          printf '%s' "${{ toJson(github.event.issue.labels) }}" > labels.json 2>/dev/null || echo "[]" > labels.json
-          LABELS=$(jq -r '[.[]?.name] | join(" ")' labels.json 2>/dev/null || echo "Not Set")
           jq -n \
             --arg text "🐞 New GitHub Issue Created" \
             --arg title "${{ github.event.issue.title || 'No Title' }}" \
             --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
-            --arg Labels "$LABELS" \
+            --argjson labels '${{ toJson(github.event.issue.labels) }}' \
             --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
             '{
               "text": $text,
@@ -42,7 +39,7 @@ jobs:
                   "type": "section",
                   "fields": [
                     { "type": "mrkdwn", "text": "*📌 Project:*\nRevolt Motors Website" },
-                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($Labels)" },
+                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($labels | map(.name) | join(";"))" },
                     { "type": "mrkdwn", "text": "*📝 Title:*\n\($title)" },
                     { "type": "mrkdwn", "text": "*👤 Assigned To:*\n\($assignee)" }
                   ]
