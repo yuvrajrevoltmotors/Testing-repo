@@ -32,7 +32,7 @@ jobs:
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "*🚨 Priority:*\n${{ github.event.issue.labels.*.name.join(', ') || 'Not Set' }}"
+                      "text": "*🚨 Priority:*\n${{ github.event.issue.labels[0] && github.event.issue.labels[0].name || 'Not Set' }}"
                     },
                     {
                       "type": "mrkdwn",
@@ -48,7 +48,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*🔗 <${{ github.event.issue.html_url }}|View Issue>*"
+                    "text": "<${{ github.event.issue.html_url }}|🔗 View Issue>"
                   }
                 }
               ]
