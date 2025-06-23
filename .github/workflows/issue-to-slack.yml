@@ -7,6 +7,7 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
+
     steps:
       - name: Install jq
         run: sudo apt-get install -y jq
@@ -22,19 +23,22 @@ jobs:
 
       - name: Prepare Payload
         run: |
-          # Extract labels into space-separated string
-          LABELS=$(echo '${{ toJson(github.event.issue.labels) }}' | jq -r '[.[].name] | join(", ")')
-          
-          # Fallback if no labels
-          if [ -z "$LABELS" ]; then
-            LABELS="Not Set"
-          fi
+          # Extract label names as args
+          LABEL_ARGS=""
+          for label in "${{ toJson(github.event.issue.labels) }}"; do
+            name=$(echo "$label" | jq -r '.name')
+            LABEL_ARGS+=" \"$name\""
+          done
+
+          LABELS_JSON=$(eval "jq -n '[ $LABEL_ARGS ]'") || LABELS_JSON='["Not Set"]'
+
+          echo "Labels JSON: $LABELS_JSON"
 
           jq -n \
             --arg text "🐞 New GitHub Issue Created" \
             --arg title "${{ github.event.issue.title || 'No Title' }}" \
             --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
-            --arg labels "$LABELS" \
+            --argjson labels "$LABELS_JSON" \
             --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
             '{
               "text": $text,
@@ -47,7 +51,7 @@ jobs:
                   "type": "section",
                   "fields": [
                     { "type": "mrkdwn", "text": "*📌 Project:*\nRevolt Motors Website" },
-                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($labels)" },
+                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($labels | join(", "))" },
                     { "type": "mrkdwn", "text": "*📝 Title:*\n\($title)" },
                     { "type": "mrkdwn", "text": "*👤 Assigned To:*\n\($assignee)" }
                   ]
@@ -59,13 +63,9 @@ jobs:
               ]
             }' > payload.json
 
-          echo "Final Payload JSON:"
-          cat payload.json
-          echo "---"
-
       - name: Send Slack Notification via curl
         run: |
-          curl -X POST -H 'Content-type: application/json' --data @payload.json ${{ secrets.SLACK_WEBHOOK }} || echo "curl failed"
+          curl -X POST -H 'Content-type: application/json' --data @payload.json ${{ secrets.SLACK_WEBHOOK }}
         continue-on-error: true
 
       - name: Debug Curl Notification
