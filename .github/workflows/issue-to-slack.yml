@@ -11,54 +11,54 @@ jobs:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Prepare Label List
-        id: prepare_labels
+      - name: Prepare payload with all labels
         run: |
-          LABELS=("${{ github.event.issue.labels[*].name }}")
-          if [ -z "${LABELS[*]}" ]; then
-            LABELS_JSON='["Not Set"]'
-          else
-            LABELS_JSON=$(jq -n --args "${LABELS[@]}" '[ $ARGS.positional[] ]')
-          fi
-          echo "Labels JSON Content: $LABELS_JSON"
-          echo "labels=$LABELS_JSON" >> $GITHUB_OUTPUT
+          echo '${{ toJson(github.event.issue.labels) }}' > labels.json
 
-      - name: Prepare Payload
-        id: build_payload
-        run: |
-          PAYLOAD=$(jq -n \
+          # Create a clean space-separated label string
+          LABEL_STRING=$(jq -r '[.[].name] | join(" ")' labels.json 2>/dev/null || echo "Not Set")
+
+          # Create the final Slack message payload
+          jq -n \
             --arg text "🐞 New GitHub Issue Created" \
-            --arg title "${{ github.event.issue.title }}" \
+            --arg project "Revolt Motors Website" \
+            --arg labels "$LABEL_STRING" \
+            --arg title "${{ github.event.issue.title || 'No Title' }}" \
             --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
-            --arg issue_url "${{ github.event.issue.html_url }}" \
-            --arg labels_txt "$(echo '${{ steps.prepare_labels.outputs.labels }}' | jq -r 'join(", ")')" \
-            ' {
+            --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
+            '{
               "text": $text,
               "blocks": [
                 {
                   "type": "header",
-                  "text": { "type": "plain_text", "text": $text, "emoji": true }
+                  "text": {
+                    "type": "plain_text",
+                    "text": $text,
+                    "emoji": true
+                  }
                 },
                 {
                   "type": "section",
                   "fields": [
-                    { "type": "mrkdwn", "text": "*📌 Project:*\nRevolt Motors Website" },
-                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n" + $labels_txt },
-                    { "type": "mrkdwn", "text": "*📝 Title:*\n" + $title },
-                    { "type": "mrkdwn", "text": "*👤 Assigned To:*\n" + $assignee }
+                    { "type": "mrkdwn", "text": "*📌 Project:*\n\($project)" },
+                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($labels)" },
+                    { "type": "mrkdwn", "text": "*📝 Title:*\n\($title)" },
+                    { "type": "mrkdwn", "text": "*👤 Assigned To:*\n\($assignee)" }
                   ]
                 },
                 {
                   "type": "section",
-                  "text": { "type": "mrkdwn", "text": "<" + $issue_url + "|🔗 View Issue>" }
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<\($issue_url)|🔗 View Issue>"
+                  }
                 }
               ]
-            }')
-          echo "$PAYLOAD" > payload.json
+            }' > payload.json
+
           echo "Payload JSON Content:"
           cat payload.json
 
-      - name: Send Slack Notification via curl
+      - name: Send to Slack
         run: |
           curl -X POST -H 'Content-type: application/json' --data @payload.json ${{ secrets.SLACK_WEBHOOK }}
-        continue-on-error: true
