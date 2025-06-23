@@ -80,8 +80,6 @@ jobs:
   ]
 }
 EOF
-          echo "✅ Payload file created:"
-          cat payload.json
 
       - name: Send Slack Notification via curl
         run: |
