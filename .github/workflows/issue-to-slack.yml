@@ -8,8 +8,20 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
+      - name: Debug GitHub Event
+        run: echo "${{ toJson(github.event.issue) }}" 
+
+      - name: Check Slack Webhook
+        run: |
+          if [ -z "${{ secrets.SLACK_WEBHOOK }}" ]; then
+            echo "SLACK_WEBHOOK is not set or empty"
+            exit 1
+          else
+            echo "SLACK_WEBHOOK is set"
+          fi
+
       - name: Send Slack notification
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
             {
@@ -32,15 +44,15 @@ jobs:
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "*🚨 Priority:*\n${{ github.event.issue.labels[0] && github.event.issue.labels[0].name || 'Not Set' }}"
+                      "text": "*🚨 Priority:*\n${{ github.event.issue.labels[0].name || 'Not Set' }}"
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "*📝 Title:*\n${{ github.event.issue.title }}"
+                      "text": "*📝 Title:*\n${{ github.event.issue.title || 'No Title' }}"
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "*👤 Assigned To:*\n${{ github.event.issue.assignee && github.event.issue.assignee.login || 'Unassigned' }}"
+                      "text": "*👤 Assigned To:*\n${{ github.event.issue.assignee.login || 'Unassigned' }}"
                     }
                   ]
                 },
