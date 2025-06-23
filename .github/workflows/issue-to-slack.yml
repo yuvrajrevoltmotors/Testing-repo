@@ -13,7 +13,7 @@ jobs:
         with:
             payload: |
               {
-                "text": "🐞 New GitHub Issue Created",  // Fallback for notifications
+                "text": "🐞 New GitHub Issue Created",  
                 "blocks": [
                 {
                 "type": "header",
