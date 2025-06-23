@@ -14,19 +14,12 @@ jobs:
 
       - name: Prepare Slack Payload
         run: |
-          echo '${{ toJSON(github.event.issue.labels) }}' > labels.json
-
-          LABELS=$(jq -r '[.[].name] | join(", ")' labels.json)
-          TITLE="${{ github.event.issue.title }}"
-          ASSIGNEE="${{ github.event.issue.assignee.login || 'Unassigned' }}"
-          ISSUE_URL="${{ github.event.issue.html_url }}"
-
           jq -n \
             --arg text "🐞 New GitHub Issue Created" \
-            --arg title "$TITLE" \
-            --arg assignee "$ASSIGNEE" \
-            --arg labels "$LABELS" \
-            --arg issue_url "$ISSUE_URL" \
+            --arg title "${{ github.event.issue.title }}" \
+            --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
+            --arg issue_url "${{ github.event.issue.html_url }}" \
+            --argjson labels '${{ toJSON(github.event.issue.labels) }}' \
             '{
               "text": $text,
               "blocks": [
@@ -38,7 +31,7 @@ jobs:
                   "type": "section",
                   "fields": [
                     { "type": "mrkdwn", "text": "*📌 Project:*\nRevolt Motors Website" },
-                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($labels)" },
+                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\((labels | map(.name) | join(", ")) // "Not Set")" },
                     { "type": "mrkdwn", "text": "*📝 Title:*\n\($title)" },
                     { "type": "mrkdwn", "text": "*👤 Assigned To:*\n\($assignee)" }
                   ]
@@ -52,6 +45,7 @@ jobs:
 
           echo "Payload prepared:"
           cat payload.json
+
 
       - name: Send Slack Notification
         run: |
