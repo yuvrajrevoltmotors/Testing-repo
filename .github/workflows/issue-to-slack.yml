@@ -14,7 +14,10 @@ jobs:
       - name: Debug GitHub Event
         run: |
           echo 'GitHub Event Issue JSON:'
-          echo "${{ toJson(github.event.issue) }}" | jq . || echo "Failed to parse github.event.issue"
+          # Write JSON to a file to avoid shell quoting issues
+          echo "${{ toJson(github.event.issue) }}" > issue.json
+          jq . issue.json || echo "Failed to parse github.event.issue"
+          cat issue.json
 
       - name: Check Slack Webhook
         run: |
@@ -27,6 +30,7 @@ jobs:
 
       - name: Debug Variables
         run: |
+          # Use jq to safely escape variables
           TITLE=$(echo '${{ github.event.issue.title || 'No Title' }}' | jq -R -s . 2>/dev/null || echo '"No Title"')
           ASSIGNEE=$(echo '${{ github.event.issue.assignee.login || 'Unassigned' }}' | jq -R -s . 2>/dev/null || echo '"Unassigned"')
           PRIORITY=$(echo '${{ github.event.issue.labels[0].name || 'Not Set' }}' | jq -R -s . 2>/dev/null || echo '"Not Set"')
@@ -39,6 +43,7 @@ jobs:
       - name: Prepare Payload
         id: prepare_payload
         run: |
+          # Use jq to construct JSON, passing variables directly
           jq -n \
             --arg title "${{ github.event.issue.title || 'No Title' }}" \
             --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
