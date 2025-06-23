@@ -22,44 +22,45 @@ jobs:
           fi
           echo "LABELS=$LABELS" >> $GITHUB_ENV
 
-           - name: Prepare Slack Payload
+      - name: Prepare Slack Payload
         env:
           TITLE: ${{ github.event.issue.title }}
           ASSIGNEE: ${{ github.event.issue.assignee.login || 'Unassigned' }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
           LABELS: ${{ env.LABELS }}
-          run: |
-            jq -n \
-              --arg text "🐞 New GitHub Issue Created" \
-              --arg title "$TITLE" \
-              --arg assignee "$ASSIGNEE" \
-              --arg issue_url "$ISSUE_URL" \
-              --arg labels "$LABELS" \
-              '{
-                text: $text,
-                blocks: [
-                  {
-                    type: "header",
-                    text: { type: "plain_text", text: $text, emoji: true }
-                  },
-                  {
-                    type: "section",
-                    fields: [
-                      { type: "mrkdwn", text: "*📌 Project:*\nRevolt Motors Website" },
-                      { type: "mrkdwn", text: "*🚨 Labels:*\n" + $labels },
-                      { type: "mrkdwn", text: "*📝 Title:*\n" + $title },
-                      { type: "mrkdwn", text: "*👤 Assigned To:*\n" + $assignee }
-                    ]
-                  },
-                  {
-                    type: "section",
-                    text: { type: "mrkdwn", text: "<" + $issue_url + "|🔗 View Issue>" }
-                  }
-                ]
-              }' > payload.json
+        run: |
+          jq -n \
+            --arg text "🐞 New GitHub Issue Created" \
+            --arg title "$TITLE" \
+            --arg assignee "$ASSIGNEE" \
+            --arg issue_url "$ISSUE_URL" \
+            --arg labels "$LABELS" \
+            '{
+              text: $text,
+              blocks: [
+                {
+                  type: "header",
+                  text: { type: "plain_text", text: $text, emoji: true }
+                },
+                {
+                  type: "section",
+                  fields: [
+                    { type: "mrkdwn", text: "*📌 Project:*\nRevolt Motors Website" },
+                    { type: "mrkdwn", text: "*🚨 Labels:*\n" + $labels },
+                    { type: "mrkdwn", text: "*📝 Title:*\n" + $title },
+                    { type: "mrkdwn", text: "*👤 Assigned To:*\n" + $assignee }
+                  ]
+                },
+                {
+                  type: "section",
+                  text: { type: "mrkdwn", text: "<" + $issue_url + "|🔗 View Issue>" }
+                }
+              ]
+            }' > payload.json
 
-              echo "✅ Payload prepared:"
-              cat payload.json
+          echo "✅ Payload prepared:"
+          cat payload.json
+
       - name: Send Slack Notification
         run: |
           curl -X POST -H 'Content-type: application/json' --data @payload.json ${{ secrets.SLACK_WEBHOOK }}
