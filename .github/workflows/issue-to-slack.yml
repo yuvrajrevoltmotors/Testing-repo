@@ -22,9 +22,9 @@ jobs:
 
       - name: Prepare Payload
         run: |
-          # Safely extract all labels, joined by newlines
+          # Safely extract all labels, joined by spaces
           printf '%s' "${{ toJson(github.event.issue.labels) }}" > labels.json 2>/dev/null || echo "[]" > labels.json
-          LABELS=$(jq -r '[.[]?.name] | join("\n")' labels.json 2>/dev/null || echo "Not Set")
+          LABELS=$(jq -r '[.[]?.name] | join(" ")' labels.json 2>/dev/null || echo "Not Set")
           jq -n \
             --arg text "🐞 New GitHub Issue Created" \
             --arg title "${{ github.event.issue.title || 'No Title' }}" \
