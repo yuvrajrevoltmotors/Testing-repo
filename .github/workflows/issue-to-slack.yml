@@ -12,7 +12,9 @@ jobs:
         run: sudo apt-get install -y jq
 
       - name: Debug GitHub Event
-        run: echo "${{ toJson(github.event.issue) }}"
+        run: |
+          echo 'GitHub Event Issue JSON:'
+          echo "${{ toJson(github.event.issue) }}" | jq . || echo "Failed to parse github.event.issue"
 
       - name: Check Slack Webhook
         run: |
@@ -25,10 +27,6 @@ jobs:
 
       - name: Debug Variables
         run: |
-          echo "Raw Title: ${{ github.event.issue.title }}"
-          echo "Raw Assignee: ${{ github.event.issue.assignee.login || 'Unassigned' }}"
-          echo "Raw Priority: ${{ github.event.issue.labels[0].name || 'Not Set' }}"
-          echo "Raw Issue URL: ${{ github.event.issue.html_url }}"
           TITLE=$(echo '${{ github.event.issue.title || 'No Title' }}' | jq -R -s . 2>/dev/null || echo '"No Title"')
           ASSIGNEE=$(echo '${{ github.event.issue.assignee.login || 'Unassigned' }}' | jq -R -s . 2>/dev/null || echo '"Unassigned"')
           PRIORITY=$(echo '${{ github.event.issue.labels[0].name || 'Not Set' }}' | jq -R -s . 2>/dev/null || echo '"Not Set"')
@@ -41,53 +39,52 @@ jobs:
       - name: Prepare Payload
         id: prepare_payload
         run: |
-          TITLE=$(echo '${{ github.event.issue.title || 'No Title' }}' | jq -R -s . 2>/dev/null || echo '"No Title"')
-          ASSIGNEE=$(echo '${{ github.event.issue.assignee.login || 'Unassigned' }}' | jq -R -s . 2>/dev/null || echo '"Unassigned"')
-          PRIORITY=$(echo '${{ github.event.issue.labels[0].name || 'Not Set' }}' | jq -R -s . 2>/dev/null || echo '"Not Set"')
-          ISSUE_URL=$(echo '${{ github.event.issue.html_url || 'No URL' }}' | jq -R -s . 2>/dev/null || echo '"No URL"')
-          cat <<EOF > payload.json
-          {
-            "text": "🐞 New GitHub Issue Created",
-            "blocks": [
-              {
-                "type": "header",
-                "text": {
-                  "type": "plain_text",
-                  "text": "🐞 New GitHub Issue Created",
-                  "emoji": true
-                }
-              },
-              {
-                "type": "section",
-                "fields": [
-                  {
-                    "type": "mrkdwn",
-                    "text": "*📌 Project:*\nRevolt Motors Website"
-                  },
-                  {
-                    "type": "mrkdwn",
-                    "text": "*🚨 Priority:*\n$PRIORITY"
-                  },
-                  {
-                    "type": "mrkdwn",
-                    "text": "*📝 Title:*\n$TITLE"
-                  },
-                  {
-                    "type": "mrkdwn",
-                    "text": "*👤 Assigned To:*\n$ASSIGNEE"
+          jq -n \
+            --arg title "${{ github.event.issue.title || 'No Title' }}" \
+            --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
+            --arg priority "${{ github.event.issue.labels[0].name || 'Not Set' }}" \
+            --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
+            '{
+              "text": "🐞 New GitHub Issue Created",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🐞 New GitHub Issue Created",
+                    "emoji": true
                   }
-                ]
-              },
-              {
-                "type": "section",
-                "text": {
-                  "type": "mrkdwn",
-                  "text": "<$ISSUE_URL|🔗 View Issue>"
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*📌 Project:*\nRevolt Motors Website"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*🚨 Priority:*\n" + $priority
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*📝 Title:*\n" + $title
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*👤 Assigned To:*\n" + $assignee
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<" + $issue_url + "|🔗 View Issue>"
+                  }
                 }
-              }
-            ]
-          }
-          EOF
+              ]
+            }' > payload.json
           cat payload.json
           jq . payload.json || echo "Invalid JSON in payload.json"
 
