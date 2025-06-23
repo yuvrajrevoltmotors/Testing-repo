@@ -9,12 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+        run: sudo apt-get install -y jq
 
       - name: Check Slack Webhook
         run: |
           if [ -z "${{ secrets.SLACK_WEBHOOK }}" ]; then
-            echo "Error: SLACK_WEBHOOK is not set or empty"
+            echo "SLACK_WEBHOOK is not set or empty"
             exit 1
           else
             echo "SLACK_WEBHOOK is set"
@@ -22,18 +22,11 @@ jobs:
 
       - name: Prepare Payload
         run: |
-          # Debug raw labels input
-          echo "Raw Labels JSON: ${{ toJson(github.event.issue.labels) }}" > labels.json 2>/dev/null || echo "[]" > labels.json
-          echo "Raw Labels JSON Content:"
-          cat labels.json
-          # Attempt to extract label names, fallback to Not Set
-          LABELS=$(jq -r '[.[]?.name // empty] | join(" ")' labels.json 2>/dev/null || echo "Not Set")
-          echo "Extracted Labels: $LABELS"
           jq -n \
             --arg text "🐞 New GitHub Issue Created" \
             --arg title "${{ github.event.issue.title || 'No Title' }}" \
             --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
-            --arg Labels "$LABELS" \
+            --arg Labels "${{ github.event.issue.labels[0].name || 'Not Set' }}" \
             --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
             '{
               "text": $text,
@@ -57,7 +50,6 @@ jobs:
                 }
               ]
             }' > payload.json
-          echo "Payload JSON:"
           cat payload.json
           jq . payload.json 2>/dev/null || echo "Invalid JSON in payload.json"
 
