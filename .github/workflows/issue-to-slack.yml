@@ -23,14 +23,18 @@ jobs:
       - name: Prepare Payload
         run: |
           # Debug raw labels input
-          echo "Raw Labels JSON: ${{ toJson(github.event.issue.labels) }}" > labels.json 2>/dev/null || echo "[]" > labels.json
+          echo "${{ toJson(github.event.issue.labels) }}" > labels.json 2>/dev/null || echo "[]" > labels.json
           echo "Raw Labels JSON Content:"
           cat labels.json
+          # Extract only label names to avoid invalid JSON
+          jq -r '[.[]?.name // empty] | join(" ")' labels.json > labels.txt 2>/dev/null || echo "Not Set" > labels.txt
+          echo "Extracted Labels Content:"
+          cat labels.txt
           jq -n \
             --arg text "🐞 New GitHub Issue Created" \
             --arg title "${{ github.event.issue.title || 'No Title' }}" \
             --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
-            --argjson labels "${{ toJson(github.event.issue.labels) || '[]' }}" \
+            --arg Labels "$(cat labels.txt)" \
             --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
             '{
               "text": $text,
@@ -43,7 +47,7 @@ jobs:
                   "type": "section",
                   "fields": [
                     { "type": "mrkdwn", "text": "*📌 Project:*\nRevolt Motors Website" },
-                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($labels | try ([.[].name // empty] | join(\" \")) catch \"Not Set\")" },
+                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($Labels)" },
                     { "type": "mrkdwn", "text": "*📝 Title:*\n\($title)" },
                     { "type": "mrkdwn", "text": "*👤 Assigned To:*\n\($assignee)" }
                   ]
@@ -54,7 +58,7 @@ jobs:
                 }
               ]
             }' > payload.json
-          echo "Payload JSON:"
+          echo "Payload JSON Content:"
           cat payload.json
           jq . payload.json 2>/dev/null || echo "Invalid JSON in payload.json"
 
