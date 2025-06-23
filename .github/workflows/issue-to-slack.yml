@@ -8,50 +8,65 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Slack notification
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          payload: |
-            {
-              "text": "🐞 New GitHub Issue Created",
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Check Slack Webhook
+        run: |
+          if [ -z "${{ secrets.SLACK_WEBHOOK }}" ]; then
+            echo "SLACK_WEBHOOK is not set or empty"
+            exit 1
+          else
+            echo "SLACK_WEBHOOK is set"
+          fi
+
+      - name: Prepare Payload
+        run: |
+          # Extract labels into space-separated string
+          LABELS=$(echo '${{ toJson(github.event.issue.labels) }}' | jq -r '[.[].name] | join(", ")')
+          
+          # Fallback if no labels
+          if [ -z "$LABELS" ]; then
+            LABELS="Not Set"
+          fi
+
+          jq -n \
+            --arg text "🐞 New GitHub Issue Created" \
+            --arg title "${{ github.event.issue.title || 'No Title' }}" \
+            --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
+            --arg labels "$LABELS" \
+            --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
+            '{
+              "text": $text,
               "blocks": [
                 {
                   "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "🐞 New GitHub Issue Created",
-                    "emoji": true
-                  }
+                  "text": { "type": "plain_text", "text": $text, "emoji": true }
                 },
                 {
                   "type": "section",
                   "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*📌 Project:*\nRevolt Motors Website"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*🚨 Labels:*\n${{ join(github.event.issue.labels.*.name, ', ') || 'Not Set' }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*📝 Title:*\n${{ github.event.issue.title }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*👤 Assigned To:*\n${{ github.event.issue.assignee.login || 'Unassigned' }}"
-                    }
+                    { "type": "mrkdwn", "text": "*📌 Project:*\nRevolt Motors Website" },
+                    { "type": "mrkdwn", "text": "*🚨 Labels:*\n\($labels)" },
+                    { "type": "mrkdwn", "text": "*📝 Title:*\n\($title)" },
+                    { "type": "mrkdwn", "text": "*👤 Assigned To:*\n\($assignee)" }
                   ]
                 },
                 {
                   "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "<${{ github.event.issue.html_url }}|🔗 View Issue>"
-                  }
+                  "text": { "type": "mrkdwn", "text": "<\($issue_url)|🔗 View Issue>" }
                 }
               ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+            }' > payload.json
+
+          echo "Final Payload JSON:"
+          cat payload.json
+          echo "---"
+
+      - name: Send Slack Notification via curl
+        run: |
+          curl -X POST -H 'Content-type: application/json' --data @payload.json ${{ secrets.SLACK_WEBHOOK }} || echo "curl failed"
+        continue-on-error: true
+
+      - name: Debug Curl Notification
+        run: echo "Curl notification step completed with exit code $?"
