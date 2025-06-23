@@ -1,4 +1,5 @@
-name: Notify Slack on Issue Created
+# .github/workflows/notify-slack-issue.yml
+name: Notify Slack on New Issue
 
 on:
   issues:
@@ -10,84 +11,60 @@ jobs:
 
     steps:
       - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-
-      - name: Check Slack Webhook
         run: |
-          if [ -z "${{ secrets.SLACK_WEBHOOK }}" ]; then
-            echo "SLACK_WEBHOOK is not set or empty"
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Validate Slack Webhook
+        run: |
+          if [[ -z "${{ secrets.SLACK_WEBHOOK }}" ]]; then
+            echo "❌ SLACK_WEBHOOK secret is not set"
             exit 1
-          else
-            echo "SLACK_WEBHOOK is set"
           fi
 
-      - name: Prepare Payload
+      - name: Prepare Slack Payload
         run: |
-          echo '${{ toJSON(github.event.issue.labels) }}' > labels.json
+          # extract label names and join with commas
+          labels=$(jq -r '.issue.labels[].name' "$GITHUB_EVENT_PATH" \
+                   | paste -sd ", " -)
+          [[ -z "$labels" ]] && labels="No labels"
 
-          # Extract multiple label names
-          LABELS=$(jq -r '[.[].name] | join(", ")' labels.json)
-          if [ -z "$LABELS" ]; then
-            LABELS="Not Set"
-          fi
+          # extract title, assignee, repo and URL
+          title=$(jq -r '.issue.title' "$GITHUB_EVENT_PATH")
+          assignee=$(jq -r '.issue.assignee.login // "Unassigned"' "$GITHUB_EVENT_PATH")
+          repo=$(jq -r '.repository.full_name' "$GITHUB_EVENT_PATH")
+          url=$(jq -r '.issue.html_url' "$GITHUB_EVENT_PATH")
 
-          TITLE="${{ github.event.issue.title }}"
-          ASSIGNEE="${{ github.event.issue.assignee.login }}"
-          ISSUE_URL="${{ github.event.issue.html_url }}"
-
-          if [ -z "$ASSIGNEE" ]; then
-            ASSIGNEE="Unassigned"
-          fi
-
-          cat <<EOF > payload.json
-{
-  "text": "🐞 New GitHub Issue Created",
-  "blocks": [
-    {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "🐞 New GitHub Issue Created",
-        "emoji": true
-      }
-    },
-    {
-      "type": "section",
-      "fields": [
-        {
-          "type": "mrkdwn",
-          "text": "*📌 Project:*\nRevolt Motors Website"
-        },
-        {
-          "type": "mrkdwn",
-          "text": "*🚨 Labels:*\n${LABELS}"
-        },
-        {
-          "type": "mrkdwn",
-          "text": "*📝 Title:*\n${TITLE}"
-        },
-        {
-          "type": "mrkdwn",
-          "text": "*👤 Assigned To:*\n${ASSIGNEE}"
-        }
-      ]
-    },
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "<${ISSUE_URL}|🔗 View Issue>"
-      }
-    }
-  ]
-}
-EOF
-
-          echo "✅ Payload prepared:"
-          cat payload.json
+          # build the Slack message payload
+          jq -n \
+            --arg header "🐞 New Issue Created" \
+            --arg repo "📌 Repo: $repo" \
+            --arg labels "🚨 Labels: $labels" \
+            --arg title "📝 Title: $title" \
+            --arg assignee "👤 Assigned To: $assignee" \
+            --arg url "$url" \
+            '{
+              text: $header,
+              blocks: [
+                { type: "header", text: { type: "plain_text", text: $header, emoji: true } },
+                { type: "section",
+                  fields: [
+                    { type: "mrkdwn", text: "*" + $repo + "*" },
+                    { type: "mrkdwn", text: "*" + $labels + "*" },
+                    { type: "mrkdwn", text: "*" + $title + "*" },
+                    { type: "mrkdwn", text: "*" + $assignee + "*" }
+                  ]
+                },
+                { type: "section",
+                  text: { type: "mrkdwn", text: "<" + $url + "|🔗 View Issue>" }
+                }
+              ]
+            }' > payload.json
 
       - name: Send Slack Notification
         run: |
-          curl -X POST -H 'Content-type: application/json' \
-            --data @payload.json \
-            ${{ secrets.SLACK_WEBHOOK }}
+          curl -X POST \
+               -H 'Content-Type: application/json' \
+               --data @payload.json \
+               "${{ secrets.SLACK_WEBHOOK }}"
+        continue-on-error: true
