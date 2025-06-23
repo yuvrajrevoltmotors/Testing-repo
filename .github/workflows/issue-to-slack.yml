@@ -23,35 +23,35 @@ jobs:
       - name: Prepare Payload
         run: |
           jq -n \
-              --arg text "🐞 New GitHub Issue Created" \
-              --arg title "${{ github.event.issue.title || 'No Title' }}" \
-              --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
-              --arg priority "${{ github.event.issue.labels[0].name || 'Not Set' }}" \
-              --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
-              '{
-                "text": $text,
-                "blocks": [
-                  {
-                    "type": "header",
-                    "text": { "type": "plain_text", "text": "🐞 New GitHub Issue Created", "emoji": true }
-                  },
-                  {
-                    "type": "section",
-                    "fields": [
-                      { "type": "mrkdwn", "text": "*📌 Project:*\nRevolt Motors Website" },
-                      { "type": "mrkdwn", "text": "*🚨 Priority:*\n" + $priority },
-                      { "type": "mrkdwn", "text": "*📝 Title:*\n" + $title },
-                      { "type": "mrkdwn", "text": "*👤 Assigned To:*\n" + $assignee }
-                    ]
-                  },
-                  {
-                    "type": "section",
-                    "text": { "type": "mrkdwn", "text": "<" + $issue_url + "|🔗 View Issue>" }
-                  }
-                ]
-              }' > payload.json
-            cat payload.json
-            jq . payload.json 2>/dev/null || echo "Invalid JSON in payload.json"
+            --arg text "🐞 New GitHub Issue Created" \
+            --arg title "${{ github.event.issue.title || 'No Title' }}" \
+            --arg assignee "${{ github.event.issue.assignee.login || 'Unassigned' }}" \
+            --arg priority "${{ github.event.issue.labels[0].name || 'Not Set' }}" \
+            --arg issue_url "${{ github.event.issue.html_url || 'No URL' }}" \
+            '{
+              "text": $text,
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": { "type": "plain_text", "text": $text, "emoji": true }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*📌 Project:*\nRevolt Motors Website" },
+                    { "type": "mrkdwn", "text": "*🚨 Priority:*\n\($priority)" },
+                    { "type": "mrkdwn", "text": "*📝 Title:*\n\($title)" },
+                    { "type": "mrkdwn", "text": "*👤 Assigned To:*\n\($assignee)" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": { "type": "mrkdwn", "text": "<\($issue_url)|🔗 View Issue>" }
+                }
+              ]
+            }' > payload.json
+          cat payload.json
+          jq . payload.json 2>/dev/null || echo "Invalid JSON in payload.json"
 
       - name: Send Slack Notification via curl
         run: |
